@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk answering tampermonkey script
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @author       6ATBA
 // @match        https://www.kinopoisk.ru/special/birthday19/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=kinopoisk.ru
@@ -11,7 +11,7 @@
 
 // SETTINGS
 const SETTING_CHECK_SAVED = true;
-const SETTING_LOG = false;
+const SETTING_LOG = true;
 const SETTING_LOG_STORAGE = false;
 const UNIVERSE_MAX_INDEX = 9;
 const CATEGORIES = {
@@ -5561,7 +5561,7 @@ const uploadAnswersToLocalStorage = () => {
 
         if (!localRawData) {
             const rawData = value.answers;
-            localStorage.setItem(localStorageID, rawData);
+            localStorage.setItem(localStorageID, JSON.stringify(rawData));
             SETTING_LOG_STORAGE && log(`STORAGED "${value.name}" (${Object.keys(rawData).length})`);
         } else {
             SETTING_LOG_STORAGE && log(`EXISTS DATA "${value.name}"`);
@@ -5687,7 +5687,7 @@ const getQuestion = type => {
                             updateCounterText(++counter);
                             log(`  🔘 [${counter}] ЗНАЮ ОТВЕТ\n    "${savedAnswerText}"`);
                             checkBase = true;
-                        }, 10);
+                        }, 500);
 
                         return false;
                     } else {
