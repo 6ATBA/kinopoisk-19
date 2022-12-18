@@ -1,5 +1,5 @@
 # kinopoisk-19
-Tampermonkey script для набора 1000 очков в .
+Tampermonkey скрипт для набора 1000 очков [в игре от Кинопоиска](https://www.kinopoisk.ru/special/birthday19/).
 
 1. Поставь расширение [tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) в браузер Chrome.
 2. Перейди по ссылке https://github.com/6ATBA/kinopoisk-19/raw/main/kinopoisk.user.js На предложение установки скрипта - устанавливай.
