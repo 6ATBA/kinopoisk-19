@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk answering tampermonkey script
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @author       6ATBA
 // @match        https://www.kinopoisk.ru/special/birthday19/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=kinopoisk.ru
@@ -5573,7 +5573,7 @@ const storageMaxCount = count => {
     if (count) {
         localStorage.setItem(maxCounterStorageID, count);
     } else {
-        return localStorage.getItem(maxCounterStorageID) || 0;
+        return Number(localStorage.getItem(maxCounterStorageID)) || 0;
     }
 };
 
@@ -5603,12 +5603,10 @@ const storeQABase = () => { localStorage.setItem(localStorageID, JSON.stringify(
 const pushNext = element => {
     if (!waitNextQuestion) {
         waitNextQuestion = true;
-        universeCycled = true;
-        if (typeof(maxCounter) == "number" && counter > maxCounter) maxCounter = counter;
-        storageMaxCount(maxCounter);
+        universeCycled = true
         log(`████████████████████████████████████\n  🏁 ОТВЕЧЕНО: ${counter} | РЕСТАРТ 🔄\n████████████████████████████████████`);
         counter = 0;
-        updateCounter();
+        updateCounterText(counter);
 
         element.click();
     };
@@ -5654,8 +5652,7 @@ const getQuestion = type => {
                 const answerText = qa[lastQuestionText];
                  if (answerText) {
                      // записываем правильный ответ
-                     counter++;
-                     updateCounter();
+                     updateCounterText(++counter);
                      log(`  🤩 [${counter}] Угадали`);
                      recordQA(lastQuestionText, answerText);
                      waitAnswer = false;
@@ -5687,8 +5684,7 @@ const getQuestion = type => {
 
                         setTimeout(() => {
                             answer.click();
-                            counter++;
-                            updateCounter();
+                            updateCounterText(++counter);
                             log(`  🔘 [${counter}] ЗНАЮ ОТВЕТ\n    "${savedAnswerText}"`);
                             checkBase = true;
                         }, 10);
@@ -5763,7 +5759,10 @@ const injectCounter = () => {
     };
 };
 
-function updateCounter() {
+function updateCounterText(counter) {
+    if (typeof(maxCounter) == "number" && counter > maxCounter) maxCounter = counter;
+    storageMaxCount(maxCounter);
+
     const universeInfoText = savedUniverseName ? `&nbsp; • &nbsp;🃏 ${savedUniverseName}` : "";
     $(".answers-counter").html(`${counter}&nbsp; / &nbsp;<svg class="card-answer-icon" viewBox="0 0 48 25"><use xlink:href="#kubok" /></svg>&nbsp;${maxCounter}${universeInfoText}`);
 };
