@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk answering tampermonkey script
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @author       6ATBA
 // @match        https://www.kinopoisk.ru/special/birthday19/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=kinopoisk.ru
@@ -5554,17 +5554,43 @@ const getTime = () => {
     return `[${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}.${date.getMilliseconds()}]`;
 };
 
+const checkDataBase = data => {
+    try {
+        JSON.parse(data);
+        return true;
+    }
+    catch(error) {
+        localStorage.setItem(localStorageID, JSON.stringify(data));
+        return false;
+    }
+};
+
+const checkEmptyStorageItem = () => {
+    const emptyItem = localStorage.getItem("");
+   if (emptyItem) localStorage.removeItem("");
+};
+
 const uploadAnswersToLocalStorage = () => {
     for (const [category, value] of Object.entries(CATEGORIES)) {
         const localStorageID = `MEMO_${value.name}`;
-        const localRawData = localStorage.getItem(localStorageID);
+        const savedRawData = localStorage.getItem(localStorageID);
+        const scriptRawData = value.answers;
 
-        if (!localRawData) {
-            const rawData = value.answers;
-            localStorage.setItem(localStorageID, JSON.stringify(rawData));
-            SETTING_LOG_STORAGE && log(`STORAGED "${value.name}" (${Object.keys(rawData).length})`);
+        checkEmptyStorageItem();
+
+        if (!savedRawData) {
+            log("NO DATA!");
+            localStorage.setItem(localStorageID, scriptRawData);
+            SETTING_LOG_STORAGE && log(`STORAGED "${value.name}" (${Object.keys(scriptRawData).length})`);
         } else {
-            SETTING_LOG_STORAGE && log(`EXISTS DATA "${value.name}"`);
+            log("DATA FOUNDED");
+            if (!checkDataBase(savedRawData)) {
+                console.log("CORRUPTED BASE DATA");
+                localStorage.setItem(localStorageID, JSON.stringify(scriptRawData));
+                console.log("REUPLOADED DATA");
+            } else {
+                SETTING_LOG_STORAGE && log(`EXISTS DATA "${value.name}"`);
+            };
         };
     };
 };
