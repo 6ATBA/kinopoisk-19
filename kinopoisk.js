@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kinopoisk answering tampermonkey script
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @author       6ATBA
 // @match        https://www.kinopoisk.ru/special/birthday19/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=kinopoisk.ru
@@ -11,9 +11,9 @@
 
 // SETTINGS
 const SETTING_CHECK_SAVED = true;
-const SETTING_LOG = true;
+const SETTING_LOG = false;
 const SETTING_LOG_STORAGE = false;
-const UNIVERSE_MAX_COUNT = 10;
+const UNIVERSE_MAX_INDEX = 9;
 const CATEGORIES = {
     "Кадры": {
         name: "CADRES",
@@ -5466,7 +5466,6 @@ $('head').append(
 var counter = 0;
 var lastQuestionText = "";
 var lastTrueAnswerText = "";
-var waitCategory = false;
 var waitNextQuestion = false;
 var waitTruthAnswer = false;
 var waitAnswer = false;
@@ -5477,7 +5476,7 @@ var firstAnswerText = "";
 var lastAnswerText = "";
 var qaStack = [];
 var speedPress = 1;
-var savedUniverseCategory = "";
+var savedUniverseName = "";
 var savedCategory = "";
 var answers = {};
 var localStorageID = "";
@@ -5485,16 +5484,17 @@ var questionType = "";
 var maxCounter = 0;
 var maxCounterStorageID = "";
 var injectedCounter = false;
+var universeCycled = false;
 var universeHypeTrain = false;
-var universeFinished = false;
-var universeStep = 0;
+var universeStepRunFinished = true;
+var universeIndex = 0;
 var started = false;
+var stageQuestion = false;
 
 const resetVars = () => {
     counter = 0;
     lastQuestionText = "";
     lastTrueAnswerText = "";
-    waitCategory = false;
     waitNextQuestion = false;
     waitTruthAnswer = false;
     waitAnswer = false;
@@ -5503,14 +5503,16 @@ const resetVars = () => {
     lastAnswerText = "";
     qaStack = [];
     speedPress = 1;
-    savedUniverseCategory = "";
+    savedUniverseName = "";
     savedCategory = "";
-    universeStep = 0;
-    universeFinished = false;
+    universeCycled = false;
+    universeIndex = 0;
+    universeStepRunFinished = true;
     started = false;
+    savedUniverseName = undefined;
 };
 
-const log = (SETTING_LOG) ? console.log : null;
+const log = (SETTING_LOG) ? console.log : () => null;
 
 // The wake lock sentinel.
 let wakeLock = null;
@@ -5520,12 +5522,17 @@ const requestWakeLock = async () => {
   try {
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener('release', () => {
-      console.log('Wake Lock was released');
+      log('Wake Lock was released');
     });
-    console.log('Wake Lock is active');
+    log('Wake Lock is active');
   } catch (err) {
     console.error(`${err.name}, ${err.message}`);
   }
+};
+
+const getTime = () => {
+    const date = new Date();
+    return `[${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}.${date.getMilliseconds()}]`;
 };
 
 const uploadAnswersToLocalStorage = () => {
@@ -5574,19 +5581,10 @@ const recordQA = (question, answer) => {
 
 const storeQABase = () => { localStorage.setItem(localStorageID, JSON.stringify(answers)) };
 
-const pushCategory = element => {
-    if (waitCategory) {
-        waitCategory = false;
-        counter = 0;
-        updateCounter();
-        element.click();
-    };
-};
-
 const pushNext = element => {
     if (!waitNextQuestion) {
         waitNextQuestion = true;
-        waitCategory = true;
+        universeCycled = true;
         if (typeof(maxCounter) == "number" && counter > maxCounter) maxCounter = counter;
         storageMaxCount(maxCounter);
         log(`████████████████████████████████████\n  🏁 ОТВЕЧЕНО: ${counter} | РЕСТАРТ 🔄\n████████████████████████████████████`);
@@ -5627,6 +5625,8 @@ const getQuestion = type => {
     const currentQuestionText = (type == "TEXT") ? $(selector.question).text() : $(selector.image).attr("src");
 
     if (lastQuestionText !== currentQuestionText) {
+        stageQuestion = true;
+        universeCategoryClickBinded = false;
         waitNextQuestion = false;
         if (checkBase) checkBase = false;
         if (waitAnswer) {
@@ -5745,7 +5745,8 @@ const injectCounter = () => {
 };
 
 function updateCounter() {
-    $(".answers-counter").html(`${counter} / <svg class="card-answer-icon" viewBox="0 0 48 25"><use xlink:href="#kubok" /></svg> ${maxCounter}`);
+    const universeInfoText = savedUniverseName ? `&nbsp; • &nbsp;🃏 ${savedUniverseName}` : "";
+    $(".answers-counter").html(`${counter}&nbsp; / &nbsp;<svg class="card-answer-icon" viewBox="0 0 48 25"><use xlink:href="#kubok" /></svg>&nbsp;${maxCounter}${universeInfoText}`);
 };
 
 function renderStoragedAnswersCount() {
@@ -5766,7 +5767,12 @@ function renderStoragedAnswersCount() {
     });
 };
 
-const runUniverse = () => {
+const pressUniverseCard = () => {
+    universeIndex = 9;
+    $($(".modal-multigame__game-card")[universeIndex]).click();
+};
+
+const universeHypeTrainInit = () => {
     const injectElement = document.querySelector(".modal-multigame__rules");
     const buttonElement = document.querySelector(".universe-train-button");
 
@@ -5774,34 +5780,54 @@ const runUniverse = () => {
         $(injectElement).append(`<button class="universe-train-button episode-card__btn episode-card__btn_current">Автостопом по галактике!</button>`);
         $(".universe-train-button").bind("click", function() {
             universeHypeTrain = true;
-            universeFinished = false;
-            universeStep = 1;
-            $(".modal-multigame__game-card").first().click();
+            pressUniverseCard();
         });
     };
 };
 
-const nextUniverse = () => {
-    universeStep++;
-    $(".modal-multigame__game-card")[universeStep].click();
-};
-
 const selectUniverseResult = () => {
-    universeFinished = true;
+    if (!universeStepRunFinished && stageQuestion) {
+        if (stageQuestion) stageQuestion = false;
+        universeStepRunFinished = true;
 
-    if (universeHypeTrain) {
-        if (universeStep < UNIVERSE_MAX_COUNT) {
+        if (universeCycled) {
             $("button.result__btn:contains(Выбрать вселенную)").click();
-            nextUniverse();
-        } else {
-            // выходим из вселенных
+            setTimeout(() => {
+                pressUniverseCard();
+            }, 300);
+        }
+
+        // выходим из категории вселенных, если прошлись по всем
+        if (!universeCycled && (universeIndex == UNIVERSE_MAX_INDEX)) {
+            universeHypeTrain = false;
             $("button.result__btn.result__btn_gray:contains(На главную)").click();
+        };
+
+        if (universeHypeTrain) {
+            universeIndex++;
+            $("button.result__btn:contains(Выбрать вселенную)").click();
+            setTimeout(() => {
+                pressUniverseCard();
+            }, 300);
         };
     };
 };
 
+const getUniverseIndexByName = name => {
+    let result;
+    $(".modal-multigame__game-card").each(function(index) {
+        const indexName = $(this).find(".modal-multigame__game-card-title").text().trim();
+        if (indexName == name) {
+            result = index;
+            return;
+        };
+    });
+    return result;
+};
+
 var onMutate = function(mutationsList) {
     mutationsList.forEach(mutation => {
+        // скипаем модалку с условиями
         if (document.querySelector(selector.start)) {
             if (!started) {
                 started = true;
@@ -5811,7 +5837,6 @@ var onMutate = function(mutationsList) {
 
         // ждем появления вопроса
         if (document.querySelector(selector.question) || document.querySelector(selector.image)) {
-            universeCategoryClickBinded = false;
             getQuestion(questionType);
 
             injectCounter();
@@ -5822,20 +5847,9 @@ var onMutate = function(mutationsList) {
             getTruthAnswer();
         };
 
-        if (document.querySelector(".modal-multigame__wrapper-game")) {
-            runUniverse();
-        };
-
-        // закончить или продолжить?
-        if (document.querySelector("section.result.game__result")) {
-            if (document.querySelector("button.result__btn")) {
-                selectUniverseResult();
-            };
-        };
-
+        // биндим обработчик на категорию
         if (document.querySelector(selector.categoryCard)) {
             const events = getEvents(".episode-card.episode-card_is-available");
-
             if (!events) {
                 renderStoragedAnswersCount();
 
@@ -5848,25 +5862,42 @@ var onMutate = function(mutationsList) {
             };
         };
 
-        // жмакаем на белую кнопку продолжить игру
-        if (document.querySelector(selector.whitebutton)) {
-            const element = $(selector.whitebutton);
-            pushNext(element);
+        // закончить или продолжить?
+        if (document.querySelector("section.result.game__result")) {
+            if (document.querySelector("button.result__btn")) {
+                selectUniverseResult();
+            };
         };
 
-        // выбираем категорию автоматически
         if (document.querySelector(selector.modalMultiGame)) {
-            const element = $(`.modal-multigame__game-card:contains(${savedUniverseCategory})`);
-            pushCategory(element);
+            // автостоп по галактике
+            universeHypeTrainInit();
 
             if (!universeCategoryClickBinded) {
                 universeCategoryClickBinded = true;
 
+                // запоминаем категорию вселенной и сбрасываем счетчик при клике на категорию
                 $(".modal-multigame__game-card").bind("click", function(){
-                    savedUniverseCategory = $(this).find(".modal-multigame__game-card-title").text().trim();
-                    maxCounter = 0;
-                    log(`Вселенная "${savedUniverseCategory}"`);
+                    universeStepRunFinished = false;
+                    const universeName = $(this).find(".modal-multigame__game-card-title").text().trim();
+                    counter = 0;
+                    savedUniverseName = universeName;
+
+                    if (!universeHypeTrain) {
+                        universeIndex = getUniverseIndexByName(universeName);
+                        universeCycled = true;
+                        maxCounter = "♾️";
+                        log(`Вселенная "${universeName}[${universeIndex}]"`);
+                    }
                 });
+            };
+        };
+
+        // жмакаем на белую кнопку продолжить игру
+        if (!universeHypeTrain) {
+            if (document.querySelector(selector.whitebutton)) {
+                const element = $(selector.whitebutton);
+                pushNext(element);
             };
         };
     });
